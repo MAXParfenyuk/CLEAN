@@ -6,60 +6,58 @@ class MergeRequest:
     for the merge request, as well as its status (open or closed).
 
     Attributes:
-        _context (dict): A dictionary that stores the number of upvotes and downvotes
+        votes (dict): A dictionary that stores the number of upvotes and downvotes
             for the merge request.
-        _status (str): A string that represents the status of the merge request.
+        status (str): A string that represents the status of the merge request.
 
     Methods:
-        status(): Returns the status of the merge request based on the number of
+        get_status(): Returns the status of the merge request based on the number of
             upvotes and downvotes.
-        vote(by_user, type): Records a vote by a user (either an upvote or downvote)
+        record_vote(by_user, vote_type): Records a vote by a user (either an upvote or downvote)
             for the merge request.
     """
 
+    OPEN = "open"
+    CLOSED = "closed"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PENDING = "pending"
+
     def __init__(self):
-        self._context = {"upvotes": set(), "downvotes": set()}
-        self._status = "open"
+        self.votes = {"upvotes": set(), "downvotes": set()}
+        self.status = MergeRequest.OPEN
 
-    def status(self):
-        if self._status == "closed":
-            return self._status
+    def get_status(self):
+        if self.status == MergeRequest.CLOSED:
+            return self.status
+        if self.votes["downvotes"]:
+            return MergeRequest.REJECTED
+        if len(self.votes["upvotes"]) >= 2:
+            return MergeRequest.APPROVED
+        return MergeRequest.PENDING
+
+    def record_vote(self, by_user, vote_type):
+        if self.status == MergeRequest.CLOSED:
+            return "Can't vote on a closed merge request"
+        if vote_type == "downvote":
+            self.votes["upvotes"].discard(by_user)
+            self.votes["downvotes"].add(by_user)
+        elif vote_type == "upvote":
+            self.votes["downvotes"].discard(by_user)
+            self.votes["upvotes"].add(by_user)
         else:
-            if self._context["downvotes"]:
-                return "rejected"
-            else:
-                if len(self._context["upvotes"]) >= 2:
-                    return "approved"
-                else:
-                    return "pending"
-        return None
-
-    def vote(self, by_user, type):
-        if self._status == "closed":
-            return "can't vote on a closed merge request"
-
-        if type == "downvote":
-            self._context["upvotes"].discard(by_user)
-            self._context["downvotes"].add(by_user)
-        elif type == "upvote":
-            self._context["downvotes"].discard(by_user)
-            self._context["upvotes"].add(by_user)
-        else:
-            return "not correct type"
+            return "Invalid vote type"
 
     def close(self):
-        if self.status() == "approved":
-            self._status = "closed"
-            return "Merge request has been approved and closed"
-        elif self.status() == "rejected":
-            self._status = "closed"
-            return "Merge request has been rejected and closed"
-        else:
-            return "Cannot close merge request until it has been approved or rejected"
+        current_status = self.get_status()
+        if current_status == MergeRequest.APPROVED or current_status == MergeRequest.REJECTED:
+            self.status = MergeRequest.CLOSED
+            return f"Merge request has been {current_status} and closed"
+        return "Cannot close merge request until it has been approved or rejected"
 
-    def getvotes(self):
-        upvotes = len(self._context["upvotes"])
-        downvotes = len(self._context["downvotes"])
+    def get_vote_summary(self):
+        upvotes = len(self.votes["upvotes"])
+        downvotes = len(self.votes["downvotes"])
         if upvotes == 0 and downvotes == 0:
             return "No votes yet"
         elif upvotes == 0:
